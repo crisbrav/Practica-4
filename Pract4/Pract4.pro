@@ -5,7 +5,9 @@ CONFIG -= qt
 
 SOURCES += \
         Enrutador.cpp \
+        Red.cpp \
         main.cpp
 
 HEADERS += \
-    Enrutador.h
+    Enrutador.h \
+    Red.h

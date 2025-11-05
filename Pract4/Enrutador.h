@@ -18,13 +18,12 @@ struct Enlace {
 
 class Enrutador {
 public:
-    string id;                            // Nombre del router (A, B, C, etc.)
-    vector<Enlace> vecinos;               // Enlaces directos
-    int distancia;                        // Distancia temporal desde fuente (para Dijkstra)
-    bool visitado;                        // Marca de visitado (para Dijkstra)
-    Enrutador* previo;                    // Predecesor en el camino mas corto (para reconstruccion)
+    string id;                            // nombre del enrutador
+    vector<Enlace> vecinos;               // enlaces directos
+    int distancia;                        // distancia temporal desde la fuente
+    bool visitado;                        // marca de visitado
+    Enrutador* previo;                    // predecesor para reconstruir camino
 
-    // Tablas finales: costo y camino completo a cada destino
     unordered_map<string,int> tablaCostos;                  // destino -> costo minimo
     unordered_map<string, vector<string>> caminosCompletos; // destino -> camino completo
 
@@ -36,3 +35,4 @@ public:
 };
 
 #endif // ENRUTADOR_H
+
