@@ -1,5 +1,6 @@
 #include "Red.h"
 #include <limits>
+#include <algorithm>
 
 using namespace std;
 
@@ -11,15 +12,19 @@ bool Red::agregarEnrutador(const string& id) {
 
 bool Red::eliminarEnrutador(const string& id) {
     if (!routers.count(id)) return false;
-    for (auto& kv : routers) kv.second->eliminarVecino(id);
+    for (auto& kv : routers) {
+        kv.second->eliminarVecino(id);
+    }
     routers.erase(id);
     return true;
 }
 
 bool Red::agregarEnlace(const string& a, const string& b, int costo, bool bidir) {
     if (!routers.count(a) || !routers.count(b)) return false;
-    routers[a]->nuevoVecino(routers[b].get(), costo);
-    if (bidir) routers[b]->nuevoVecino(routers[a].get(), costo);
+    auto* A = routers[a].get();
+    auto* B = routers[b].get();
+    A->nuevoVecino(B, costo);
+    if (bidir) B->nuevoVecino(A, costo);
     return true;
 }
 
@@ -32,7 +37,8 @@ bool Red::eliminarEnlace(const string& a, const string& b, bool bidir) {
 
 bool Red::actualizarCosto(const string& a, const string& b, int costo, bool bidir) {
     if (!routers.count(a) || !routers.count(b)) return false;
-    return agregarEnlace(a, b, costo, bidir);
+    agregarEnlace(a,b,costo,bidir);
+    return true;
 }
 
 static bool leerLineaValida(ifstream& in, string& out) {
@@ -108,28 +114,31 @@ void Red::generarAleatoria(int n, double densidad, int cmin, int cmax, unsigned 
 }
 
 void Red::recomputarTablas() {
-    for (auto& kv : routers) dijkstra(kv.second.get());
+    for (auto& kv : routers) {
+        dijkstra(kv.second.get());
+    }
 }
 
 void Red::dijkstra(Enrutador* fuente) {
     for (auto& kv : routers) kv.second->reinicio();
     fuente->distancia = 0;
 
-    priority_queue<PQN, vector<PQN>, Cmp> pq;
+    using Nodo = pair<int, Enrutador*>;
+    auto cmp = [](const Nodo& a, const Nodo& b){ return a.first > b.first; };
+    priority_queue<Nodo, vector<Nodo>, decltype(cmp)> pq(cmp);
     pq.push({0, fuente});
 
-    while (!pq.empty()) {
-        auto cur = pq.top(); pq.pop();
-        Enrutador* u = cur.p;
-        if (u->visitado) continue;
-        u->visitado = true;
+    while(!pq.empty()){
+        auto [dist, actual] = pq.top(); pq.pop();
+        if (actual->visitado) continue;
+        actual->visitado = true;
 
-        for (auto& e : u->vecinos) {
+        for (auto& e : actual->vecinos){
             Enrutador* v = e.vecino;
-            int nd = u->distancia + e.costo;
-            if (nd < v->distancia) {
+            int nd = actual->distancia + e.costo;
+            if (nd < v->distancia){
                 v->distancia = nd;
-                v->previo = u;
+                v->previo = actual;
                 pq.push({nd, v});
             }
         }
@@ -137,27 +146,69 @@ void Red::dijkstra(Enrutador* fuente) {
 
     fuente->tablaCostos.clear();
     fuente->caminosCompletos.clear();
-    for (auto& kv : routers) {
+    for (auto& kv : routers){
         Enrutador* dest = kv.second.get();
-        if (dest->distancia == numeric_limits<int>::max()) continue;
-        vector<string> path = reconstruirCamino(dest);
-        fuente->tablaCostos[dest->id] = dest->distancia;
-        fuente->caminosCompletos[dest->id] = move(path);
+        int costo = dest->distancia;
+        if (costo == numeric_limits<int>::max()) continue;
+        vector<string> camino = reconstruirCamino(dest);
+        fuente->tablaCostos[dest->id] = costo;
+        fuente->caminosCompletos[dest->id] = move(camino);
     }
 }
 
 vector<string> Red::reconstruirCamino(Enrutador* destino) const {
     vector<string> camino;
-    for (Enrutador* cur = destino; cur; cur = cur->previo) camino.push_back(cur->id);
+    Enrutador* cur = destino;
+    while (cur){
+        camino.push_back(cur->id);
+        cur = cur->previo;
+    }
     reverse(camino.begin(), camino.end());
     return camino;
 }
 
 pair<int, vector<string>> Red::rutaMasCorta(const string& origen, const string& destino) const {
     if (!routers.count(origen) || !routers.count(destino)) return {-1, {}};
-    const Enrutador* o = routers.at(origen).get();
+    auto* o = routers.at(origen).get();
     auto itC = o->tablaCostos.find(destino);
     auto itP = o->caminosCompletos.find(destino);
     if (itC == o->tablaCostos.end() || itP == o->caminosCompletos.end()) return {-1, {}};
     return {itC->second, itP->second};
+}
+
+void Red::imprimirTabla(const string& origen) const {
+    if (!routers.count(origen)) {
+        cout << "Enrutador no existe\n";
+        return;
+    }
+    const Enrutador* o = routers.at(origen).get();
+    cout << "Tabla de " << origen << ":\n";
+    for (auto& kv : o->tablaCostos) {
+        const string& dest = kv.first;
+        int costo = kv.second;
+        cout << "  Destino " << dest << " | Costo " << costo << " | Camino: ";
+        auto itP = o->caminosCompletos.find(dest);
+        if (itP != o->caminosCompletos.end()) {
+            const auto& cam = itP->second;
+            for (size_t i=0;i<cam.size();++i){
+                if (i) cout << " -> ";
+                cout << cam[i];
+            }
+        }
+        cout << "\n";
+    }
+}
+
+void Red::listarRed() const {
+    cout << "Enrutadores y enlaces:\n";
+    for (auto& kv : routers) {
+        const auto& id = kv.first;
+        const auto& r = kv.second;
+        cout << "  " << id << " : ";
+        for (size_t i=0;i<r->vecinos.size();++i) {
+            if (i) cout << " , ";
+            cout << r->vecinos[i].vecino->id << "(" << r->vecinos[i].costo << ")";
+        }
+        cout << "\n";
+    }
 }

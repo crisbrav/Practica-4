@@ -4,13 +4,10 @@
 #include "Enrutador.h"
 #include <memory>
 #include <queue>
-#include <unordered_map>
-#include <vector>
-#include <string>
 #include <fstream>
 #include <sstream>
 #include <random>
-#include <algorithm>
+#include <set>
 
 using namespace std;
 
@@ -25,18 +22,29 @@ public:
     bool eliminarEnlace(const string& a, const string& b, bool bidir=true);
     bool actualizarCosto(const string& a, const string& b, int costo, bool bidir=true);
 
-    bool cargarDesdeArchivo(const string& ruta);   // N M | N nombres | M lineas u v w
+    bool cargarDesdeArchivo(const string& ruta);
     void generarAleatoria(int n, double densidad, int cmin, int cmax, unsigned seed=0);
 
     void recomputarTablas();
     pair<int, vector<string>> rutaMasCorta(const string& origen, const string& destino) const;
 
+    void imprimirTabla(const string& origen) const;
+    void listarRed() const;
+
 private:
-    struct PQN { int d; Enrutador* p; };
-    struct Cmp { bool operator()(const PQN& a, const PQN& b) const { return a.d > b.d; } };
+    struct PQN {
+        int d;
+        Enrutador* p;
+    };
+    struct Cmp {
+        bool operator()(const PQN& a, const PQN& b) const { return a.d > b.d; }
+    };
 
     void dijkstra(Enrutador* fuente);
     vector<string> reconstruirCamino(Enrutador* destino) const;
+
+    static bool esComentarioOVacia(const string& s);
+    static string trim(const string& s);
 };
 
 #endif // RED_H
